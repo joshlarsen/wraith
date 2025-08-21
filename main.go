@@ -29,19 +29,19 @@ func main() {
 	ctx := context.Background()
 
 	// Initialize components
-	storage, err := storage.NewFirestore(ctx, cfg.Firestore)
+	storage, err := storage.NewFirestore(ctx, &cfg.Firestore)
 	if err != nil {
 		log.Fatalf("Failed to initialize Firestore: %v", err)
 	}
 	defer storage.Close()
 
-	llmClient, err := classifier.NewLLMClient(cfg.LLM)
+	llmClient, err := classifier.NewLLMClient(&cfg.LLM)
 	if err != nil {
 		log.Fatalf("Failed to initialize LLM client: %v", err)
 	}
 
 	classifier := classifier.New(llmClient)
-	downloader := downloader.New(cfg.OSV)
+	downloader := downloader.New(&cfg.OSV)
 
 	// Get last processed timestamp if resuming
 	var lastTimestamp string
@@ -54,10 +54,10 @@ func main() {
 
 	// Start processing
 	processor := &VulnerabilityProcessor{
-		downloader:  downloader,
-		classifier:  classifier,
-		storage:     storage,
-		batchSize:   *batchSize,
+		downloader:    downloader,
+		classifier:    classifier,
+		storage:       storage,
+		batchSize:     *batchSize,
 		lastTimestamp: lastTimestamp,
 	}
 
@@ -79,7 +79,7 @@ type VulnerabilityProcessor struct {
 
 func (p *VulnerabilityProcessor) Run(ctx context.Context) error {
 	log.Printf("Starting vulnerability processing with batch size %d", p.batchSize)
-	
+
 	if p.lastTimestamp != "" {
 		log.Printf("Resuming from timestamp: %s", p.lastTimestamp)
 	}

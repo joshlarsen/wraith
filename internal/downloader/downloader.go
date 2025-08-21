@@ -1,7 +1,6 @@
 package downloader
 
 import (
-	"bufio"
 	"context"
 	"encoding/csv"
 	"encoding/json"
@@ -20,11 +19,11 @@ type Downloader struct {
 }
 
 type Vulnerability struct {
-	ID       string    `json:"id"`
-	Modified string    `json:"modified"`
-	Summary  string    `json:"summary"`
-	Details  string    `json:"details"`
-	Aliases  []string  `json:"aliases"`
+	ID       string   `json:"id"`
+	Modified string   `json:"modified"`
+	Summary  string   `json:"summary"`
+	Details  string   `json:"details"`
+	Aliases  []string `json:"aliases"`
 	Affected []struct {
 		Package struct {
 			Name      string `json:"name"`
@@ -50,10 +49,10 @@ type Vulnerability struct {
 }
 
 type CSVRecord struct {
-	Modified   string
-	Ecosystem  string
-	VulnID     string
-	FullPath   string
+	Modified  string
+	Ecosystem string
+	VulnID    string
+	FullPath  string
 }
 
 func New(cfg *config.OSVConfig) *Downloader {
@@ -173,7 +172,7 @@ func (d *Downloader) processBatch(ctx context.Context, batch []*CSVRecord, proce
 		}
 
 		vuln.Modified = record.Modified // Ensure we have the CSV timestamp
-		
+
 		if err := processFunc(ctx, vuln); err != nil {
 			return fmt.Errorf("processing vulnerability %s: %w", record.VulnID, err)
 		}
@@ -183,7 +182,7 @@ func (d *Downloader) processBatch(ctx context.Context, batch []*CSVRecord, proce
 
 func (d *Downloader) fetchVulnerability(ctx context.Context, vulnID string) (*Vulnerability, error) {
 	url := fmt.Sprintf("%s/vulns/%s", d.config.APIURL, vulnID)
-	
+
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("creating request: %w", err)

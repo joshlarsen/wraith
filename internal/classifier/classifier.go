@@ -13,25 +13,25 @@ import (
 // Classification represents our 6-dimensional vulnerability classification
 type Classification struct {
 	VulnerabilityID string `json:"vulnerability_id" firestore:"vulnerability_id"`
-	
+
 	// 1. Verifiability
 	Verifiability string `json:"verifiability" firestore:"verifiability"` // verifiable, non-verifiable, partially-verifiable
-	
+
 	// 2. Exploitability Context
 	ExploitabilityContext string `json:"exploitability_context" firestore:"exploitability_context"` // direct-dependency, transitive-dependency, development-only, runtime-critical
-	
+
 	// 3. Attack Vector Accessibility
 	AttackVector string `json:"attack_vector" firestore:"attack_vector"` // user-input-required, network-accessible, local-only, configuration-dependent
-	
+
 	// 4. Impact Scope
 	ImpactScope string `json:"impact_scope" firestore:"impact_scope"` // data-confidentiality, data-integrity, system-availability, code-execution, privilege-escalation
-	
+
 	// 5. Remediation Complexity
 	RemediationComplexity string `json:"remediation_complexity" firestore:"remediation_complexity"` // simple-update, breaking-change, no-fix-available, workaround-available, architecture-change
-	
+
 	// 6. Temporal Classification
 	TemporalClassification string `json:"temporal_classification" firestore:"temporal_classification"` // zero-day, active-exploitation, stable-mature, legacy
-	
+
 	// Additional metadata
 	Reasoning   string `json:"reasoning" firestore:"reasoning"`
 	ProcessedAt string `json:"processed_at" firestore:"processed_at"`
@@ -49,7 +49,7 @@ func New(llmClient LLMClient) *Classifier {
 
 func (c *Classifier) Classify(ctx context.Context, vuln *downloader.Vulnerability) (*Classification, error) {
 	prompt := c.buildClassificationPrompt(vuln)
-	
+
 	messages := []Message{
 		{
 			Role:    "system",
@@ -78,10 +78,10 @@ func (c *Classifier) buildClassificationPrompt(vuln *downloader.Vulnerability) s
 	var builder strings.Builder
 
 	builder.WriteString("Please classify this vulnerability using our 6-dimensional system:\n\n")
-	
+
 	builder.WriteString(fmt.Sprintf("Vulnerability ID: %s\n", vuln.ID))
 	builder.WriteString(fmt.Sprintf("Summary: %s\n", vuln.Summary))
-	
+
 	if vuln.Details != "" {
 		builder.WriteString(fmt.Sprintf("Details: %s\n", vuln.Details))
 	}
@@ -120,13 +120,13 @@ func (c *Classifier) parseClassificationResponse(response, vulnID string) (*Clas
 	// Try to extract JSON from the response
 	jsonStart := strings.Index(response, "{")
 	jsonEnd := strings.LastIndex(response, "}")
-	
+
 	if jsonStart == -1 || jsonEnd == -1 || jsonEnd <= jsonStart {
 		return nil, fmt.Errorf("no JSON found in response")
 	}
 
 	jsonStr := response[jsonStart : jsonEnd+1]
-	
+
 	var classification Classification
 	if err := json.Unmarshal([]byte(jsonStr), &classification); err != nil {
 		return nil, fmt.Errorf("unmarshaling JSON: %w", err)
@@ -139,26 +139,26 @@ func (c *Classifier) parseClassificationResponse(response, vulnID string) (*Clas
 
 	classification.VulnerabilityID = vulnID
 	classification.ProcessedAt = time.Now().Format(time.RFC3339)
-	
+
 	return &classification, nil
 }
 
 func (c *Classifier) validateClassification(classification *Classification) error {
 	validValues := map[string][]string{
-		"verifiability": {"verifiable", "non-verifiable", "partially-verifiable"},
-		"exploitability_context": {"direct-dependency", "transitive-dependency", "development-only", "runtime-critical"},
-		"attack_vector": {"user-input-required", "network-accessible", "local-only", "configuration-dependent"},
-		"impact_scope": {"data-confidentiality", "data-integrity", "system-availability", "code-execution", "privilege-escalation"},
-		"remediation_complexity": {"simple-update", "breaking-change", "no-fix-available", "workaround-available", "architecture-change"},
+		"verifiability":           {"verifiable", "non-verifiable", "partially-verifiable"},
+		"exploitability_context":  {"direct-dependency", "transitive-dependency", "development-only", "runtime-critical"},
+		"attack_vector":           {"user-input-required", "network-accessible", "local-only", "configuration-dependent"},
+		"impact_scope":            {"data-confidentiality", "data-integrity", "system-availability", "code-execution", "privilege-escalation"},
+		"remediation_complexity":  {"simple-update", "breaking-change", "no-fix-available", "workaround-available", "architecture-change"},
 		"temporal_classification": {"zero-day", "active-exploitation", "stable-mature", "legacy"},
 	}
 
 	fields := map[string]string{
-		"verifiability": classification.Verifiability,
-		"exploitability_context": classification.ExploitabilityContext,
-		"attack_vector": classification.AttackVector,
-		"impact_scope": classification.ImpactScope,
-		"remediation_complexity": classification.RemediationComplexity,
+		"verifiability":           classification.Verifiability,
+		"exploitability_context":  classification.ExploitabilityContext,
+		"attack_vector":           classification.AttackVector,
+		"impact_scope":            classification.ImpactScope,
+		"remediation_complexity":  classification.RemediationComplexity,
 		"temporal_classification": classification.TemporalClassification,
 	}
 
@@ -166,7 +166,7 @@ func (c *Classifier) validateClassification(classification *Classification) erro
 		if value == "" {
 			return fmt.Errorf("missing required field: %s", field)
 		}
-		
+
 		valid := false
 		for _, validValue := range validValues[field] {
 			if value == validValue {
@@ -174,7 +174,7 @@ func (c *Classifier) validateClassification(classification *Classification) erro
 				break
 			}
 		}
-		
+
 		if !valid {
 			return fmt.Errorf("invalid value for %s: %s (valid: %v)", field, value, validValues[field])
 		}

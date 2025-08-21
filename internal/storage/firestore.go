@@ -9,6 +9,8 @@ import (
 	"github.com/ghostsecurity/vscan/internal/classifier"
 	"github.com/ghostsecurity/vscan/internal/config"
 	"google.golang.org/api/option"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type Storage interface {
@@ -71,7 +73,7 @@ func (fs *FirestoreStorage) GetLastProcessedTimestamp(ctx context.Context) (stri
 	doc, err := fs.client.Collection("processing_state").Doc("vulnerability_scanner").Get(ctx)
 	if err != nil {
 		// If document doesn't exist, return empty string (start from beginning)
-		if firestore.IsNotFound(err) {
+		if status.Code(err) == codes.NotFound {
 			return "", nil
 		}
 		return "", fmt.Errorf("getting last processed timestamp: %w", err)
@@ -103,28 +105,24 @@ func (fs *FirestoreStorage) Close() error {
 	return fs.client.Close()
 }
 
-// BatchStoreClassifications stores multiple classifications in a batch
+// BatchStoreClassifications stores multiple classifications in a transaction
 func (fs *FirestoreStorage) BatchStoreClassifications(ctx context.Context, classifications map[string]*classifier.Classification) error {
-	batch := fs.client.Batch()
-
-	for vulnID, classification := range classifications {
-		ref := fs.client.Collection(fs.collection).Doc(vulnID)
-		batch.Set(ref, classification)
-	}
-
-	_, err := batch.Commit(ctx)
-	if err != nil {
-		return fmt.Errorf("committing batch: %w", err)
-	}
-
-	return nil
+	return fs.client.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
+		for vulnID, classification := range classifications {
+			ref := fs.client.Collection(fs.collection).Doc(vulnID)
+			if err := tx.Set(ref, classification); err != nil {
+				return fmt.Errorf("setting classification in transaction: %w", err)
+			}
+		}
+		return nil
+	})
 }
 
 // GetClassification retrieves a stored classification
 func (fs *FirestoreStorage) GetClassification(ctx context.Context, vulnID string) (*classifier.Classification, error) {
 	doc, err := fs.client.Collection(fs.collection).Doc(vulnID).Get(ctx)
 	if err != nil {
-		if firestore.IsNotFound(err) {
+		if status.Code(err) == codes.NotFound {
 			return nil, nil // Not found
 		}
 		return nil, fmt.Errorf("getting classification for %s: %w", vulnID, err)
@@ -142,7 +140,7 @@ func (fs *FirestoreStorage) GetClassification(ctx context.Context, vulnID string
 func (fs *FirestoreStorage) ClassificationExists(ctx context.Context, vulnID string) (bool, error) {
 	_, err := fs.client.Collection(fs.collection).Doc(vulnID).Get(ctx)
 	if err != nil {
-		if firestore.IsNotFound(err) {
+		if status.Code(err) == codes.NotFound {
 			return false, nil
 		}
 		return false, fmt.Errorf("checking if classification exists: %w", err)
