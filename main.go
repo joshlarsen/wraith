@@ -129,7 +129,7 @@ func (p *VulnerabilityProcessor) processVulnerability(ctx context.Context, vuln 
 	p.totalTokens += classification.TotalTokens
 	p.processedCount++
 
-	log.Printf("Processed vulnerability: %s (processing: %dms, tokens: %d input/%d output/%d total)",
+	log.Printf("Processed vulnerability: %s (processing: %dms, tokens: ↑ %d t / ↓%d t (%d)",
 		vuln.ID,
 		classification.ProcessingTimeMs,
 		classification.InputTokens,

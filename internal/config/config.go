@@ -20,17 +20,14 @@ type FirestoreConfig struct {
 }
 
 type LLMConfig struct {
-	Provider string                 `yaml:"provider"` // "openai", "anthropic", "vertex"
-	Model    string                 `yaml:"model"`
-	APIKey   string                 `yaml:"api_key,omitempty"`
-	Endpoint string                 `yaml:"endpoint,omitempty"`
-	Options  map[string]interface{} `yaml:"options,omitempty"`
+	Model   string `yaml:"model"`
+	APIKey  string `yaml:"api_key"`
+	BaseURL string `yaml:"base_url,omitempty"` // Optional: custom base URL, defaults to "https://api.openai.com/v1"
 }
 
 type OSVConfig struct {
 	ModifiedCSVURL string `yaml:"modified_csv_url"`
 	APIURL         string `yaml:"api_url"`
-	BASEURL        string `yaml:"base_url"`
 	Ecosystem      string `yaml:"ecosystem,omitempty"` // Optional: filter by ecosystem
 }
 
@@ -49,9 +46,7 @@ func Load(path string) (*Config, error) {
 	if cfg.OSV.ModifiedCSVURL == "" {
 		cfg.OSV.ModifiedCSVURL = "https://osv-vulnerabilities.storage.googleapis.com/modified_id.csv"
 	}
-	if cfg.OSV.BASEURL == "" {
-		cfg.OSV.BASEURL = "https://osv.dev"
-	}
+
 	if cfg.OSV.APIURL == "" {
 		cfg.OSV.APIURL = "https://api.osv.dev/v1"
 	}
