@@ -17,7 +17,7 @@ import (
 // LLMClient interface allows for different LLM providers
 type LLMClient interface {
 	Chat(ctx context.Context, messages []Message) (*ChatResponse, error)
-	ChatStructured(ctx context.Context, messages []Message, responseStruct interface{}) (interface{}, error)
+	ChatStructured(ctx context.Context, messages []Message, responseStruct interface{}) (*StructuredResponse, error)
 }
 
 type Message struct {
@@ -26,7 +26,17 @@ type Message struct {
 }
 
 type ChatResponse struct {
-	Content string `json:"content"`
+	Content      string `json:"content"`
+	InputTokens  int    `json:"input_tokens,omitempty"`
+	OutputTokens int    `json:"output_tokens,omitempty"`
+	TotalTokens  int    `json:"total_tokens,omitempty"`
+}
+
+type StructuredResponse struct {
+	Result       interface{} `json:"result"`
+	InputTokens  int         `json:"input_tokens,omitempty"`
+	OutputTokens int         `json:"output_tokens,omitempty"`
+	TotalTokens  int         `json:"total_tokens,omitempty"`
 }
 
 // OpenAIClient implements LLMClient for OpenAI API
@@ -129,7 +139,7 @@ func (c *OpenAIClient) Chat(ctx context.Context, messages []Message) (*ChatRespo
 	return c.makeRequest(ctx, "/chat/completions", payload)
 }
 
-func (c *OpenAIClient) ChatStructured(ctx context.Context, messages []Message, responseStruct interface{}) (interface{}, error) {
+func (c *OpenAIClient) ChatStructured(ctx context.Context, messages []Message, responseStruct interface{}) (*StructuredResponse, error) {
 	// Generate JSON schema from the struct
 	reflector := jsonschema.Reflector{}
 	schema, err := reflector.Reflect(responseStruct)
@@ -179,7 +189,12 @@ func (c *OpenAIClient) ChatStructured(ctx context.Context, messages []Message, r
 		return nil, fmt.Errorf("unmarshaling structured response: %w", err)
 	}
 
-	return result, nil
+	return &StructuredResponse{
+		Result:       result,
+		InputTokens:  response.InputTokens,
+		OutputTokens: response.OutputTokens,
+		TotalTokens:  response.TotalTokens,
+	}, nil
 }
 
 func (c *OpenAIClient) makeRequest(ctx context.Context, endpoint string, payload map[string]interface{}) (*ChatResponse, error) {
@@ -213,6 +228,11 @@ func (c *OpenAIClient) makeRequest(ctx context.Context, endpoint string, payload
 				Content string `json:"content"`
 			} `json:"message"`
 		} `json:"choices"`
+		Usage struct {
+			PromptTokens     int `json:"prompt_tokens"`
+			CompletionTokens int `json:"completion_tokens"`
+			TotalTokens      int `json:"total_tokens"`
+		} `json:"usage"`
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
@@ -224,7 +244,10 @@ func (c *OpenAIClient) makeRequest(ctx context.Context, endpoint string, payload
 	}
 
 	return &ChatResponse{
-		Content: result.Choices[0].Message.Content,
+		Content:      result.Choices[0].Message.Content,
+		InputTokens:  result.Usage.PromptTokens,
+		OutputTokens: result.Usage.CompletionTokens,
+		TotalTokens:  result.Usage.TotalTokens,
 	}, nil
 }
 
@@ -255,7 +278,7 @@ func (c *AnthropicClient) Chat(ctx context.Context, messages []Message) (*ChatRe
 	return c.makeRequest(ctx, "/messages", payload)
 }
 
-func (c *AnthropicClient) ChatStructured(ctx context.Context, messages []Message, responseStruct interface{}) (interface{}, error) {
+func (c *AnthropicClient) ChatStructured(ctx context.Context, messages []Message, responseStruct interface{}) (*StructuredResponse, error) {
 	// Generate JSON schema from the struct
 	reflector := jsonschema.Reflector{}
 	schema, err := reflector.Reflect(responseStruct)
@@ -317,7 +340,12 @@ func (c *AnthropicClient) ChatStructured(ctx context.Context, messages []Message
 		return nil, fmt.Errorf("unmarshaling structured response: %w", err)
 	}
 
-	return result, nil
+	return &StructuredResponse{
+		Result:       result,
+		InputTokens:  response.InputTokens,
+		OutputTokens: response.OutputTokens,
+		TotalTokens:  response.TotalTokens,
+	}, nil
 }
 
 func (c *AnthropicClient) makeRequest(ctx context.Context, endpoint string, payload map[string]interface{}) (*ChatResponse, error) {
@@ -350,6 +378,10 @@ func (c *AnthropicClient) makeRequest(ctx context.Context, endpoint string, payl
 		Content []struct {
 			Text string `json:"text"`
 		} `json:"content"`
+		Usage struct {
+			InputTokens  int `json:"input_tokens"`
+			OutputTokens int `json:"output_tokens"`
+		} `json:"usage"`
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
@@ -361,7 +393,10 @@ func (c *AnthropicClient) makeRequest(ctx context.Context, endpoint string, payl
 	}
 
 	return &ChatResponse{
-		Content: result.Content[0].Text,
+		Content:      result.Content[0].Text,
+		InputTokens:  result.Usage.InputTokens,
+		OutputTokens: result.Usage.OutputTokens,
+		TotalTokens:  result.Usage.InputTokens + result.Usage.OutputTokens,
 	}, nil
 }
 
@@ -372,7 +407,7 @@ func (c *VertexClient) Chat(ctx context.Context, messages []Message) (*ChatRespo
 	return nil, fmt.Errorf("Vertex AI implementation requires Google Cloud SDK setup")
 }
 
-func (c *VertexClient) ChatStructured(ctx context.Context, messages []Message, responseStruct interface{}) (interface{}, error) {
+func (c *VertexClient) ChatStructured(ctx context.Context, messages []Message, responseStruct interface{}) (*StructuredResponse, error) {
 	// This is a simplified implementation
 	// In production, you'd use the Google Cloud SDK and proper authentication
 	return nil, fmt.Errorf("Vertex AI structured output implementation requires Google Cloud SDK setup")

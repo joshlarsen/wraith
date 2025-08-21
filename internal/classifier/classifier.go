@@ -35,7 +35,13 @@ type Classification struct {
 
 	// Additional metadata
 	Reasoning   string `json:"reasoning" firestore:"reasoning" required:"true" description:"Brief explanation of the classification decisions"`
-	ProcessedAt string `json:"processed_at" firestore:"processed_at" required:"true" description:"Timestamp when the classification was processed"`
+	ProcessedAt string `json:"-" firestore:"processed_at"`
+
+	// Processing metrics
+	ProcessingTimeMs int64 `json:"-" firestore:"processing_time_ms"`
+	InputTokens      int   `json:"-" firestore:"input_tokens"`
+	OutputTokens     int   `json:"-" firestore:"output_tokens"`
+	TotalTokens      int   `json:"-" firestore:"total_tokens"`
 }
 
 type Classifier struct {
@@ -51,6 +57,8 @@ func New(llmClient LLMClient, osvConfig *config.OSVConfig) *Classifier {
 }
 
 func (c *Classifier) Classify(ctx context.Context, vuln *downloader.Vulnerability) (*Classification, error) {
+	startTime := time.Now()
+
 	prompt := c.buildClassificationPrompt(vuln)
 
 	messages := []Message{
@@ -69,9 +77,9 @@ func (c *Classifier) Classify(ctx context.Context, vuln *downloader.Vulnerabilit
 		return nil, fmt.Errorf("LLM structured classification failed: %w", err)
 	}
 
-	classification, ok := result.(*Classification)
+	classification, ok := result.Result.(*Classification)
 	if !ok {
-		return nil, fmt.Errorf("unexpected response type: %T", result)
+		return nil, fmt.Errorf("unexpected response type: %T", result.Result)
 	}
 
 	// Validate required fields
@@ -79,9 +87,15 @@ func (c *Classifier) Classify(ctx context.Context, vuln *downloader.Vulnerabilit
 		return nil, fmt.Errorf("validation failed: %w", err)
 	}
 
+	// Set metadata and metrics
+	processingTime := time.Since(startTime)
 	classification.VulnerabilityID = vuln.ID
-	classification.VulnerabilityURL = fmt.Sprintf("%s/vulnerability/%s", c.osvConfig.BASEURL, vuln.ID)
+	classification.VulnerabilityURL = fmt.Sprintf("%s/vulns/%s", c.osvConfig.APIURL, vuln.ID)
 	classification.ProcessedAt = time.Now().Format(time.RFC3339)
+	classification.ProcessingTimeMs = processingTime.Milliseconds()
+	classification.InputTokens = result.InputTokens
+	classification.OutputTokens = result.OutputTokens
+	classification.TotalTokens = result.TotalTokens
 
 	return classification, nil
 }
