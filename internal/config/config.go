@@ -1,0 +1,58 @@
+package config
+
+import (
+	"fmt"
+	"os"
+
+	"gopkg.in/yaml.v3"
+)
+
+type Config struct {
+	Firestore FirestoreConfig `yaml:"firestore"`
+	LLM       LLMConfig       `yaml:"llm"`
+	OSV       OSVConfig       `yaml:"osv"`
+}
+
+type FirestoreConfig struct {
+	ProjectID  string `yaml:"project_id"`
+	Collection string `yaml:"collection"`
+}
+
+type LLMConfig struct {
+	Provider string                 `yaml:"provider"` // "openai", "anthropic", "vertex"
+	Model    string                 `yaml:"model"`
+	APIKey   string                 `yaml:"api_key,omitempty"`
+	Endpoint string                 `yaml:"endpoint,omitempty"`
+	Options  map[string]interface{} `yaml:"options,omitempty"`
+}
+
+type OSVConfig struct {
+	ModifiedCSVURL string `yaml:"modified_csv_url"`
+	APIURL         string `yaml:"api_url"`
+	Ecosystem      string `yaml:"ecosystem,omitempty"` // Optional: filter by ecosystem
+}
+
+func Load(path string) (*Config, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("reading config file: %w", err)
+	}
+
+	var cfg Config
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
+		return nil, fmt.Errorf("parsing config file: %w", err)
+	}
+
+	// Set defaults
+	if cfg.OSV.ModifiedCSVURL == "" {
+		cfg.OSV.ModifiedCSVURL = "https://osv-vulnerabilities.storage.googleapis.com/modified_id.csv"
+	}
+	if cfg.OSV.APIURL == "" {
+		cfg.OSV.APIURL = "https://api.osv.dev/v1"
+	}
+	if cfg.Firestore.Collection == "" {
+		cfg.Firestore.Collection = "vulnerability_classifications"
+	}
+
+	return &cfg, nil
+}
