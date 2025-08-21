@@ -29,6 +29,8 @@ type OSVConfig struct {
 	ModifiedCSVURL string `yaml:"modified_csv_url"`
 	APIURL         string `yaml:"api_url"`
 	Ecosystem      string `yaml:"ecosystem,omitempty"` // Optional: filter by ecosystem
+	CacheDir       string `yaml:"cache_dir,omitempty"` // Optional: cache directory for CSV files
+	CacheTTL       int    `yaml:"cache_ttl,omitempty"` // Optional: cache TTL in hours, 0 = no expiration
 }
 
 func Load(path string) (*Config, error) {
@@ -55,6 +57,12 @@ func Load(path string) (*Config, error) {
 	}
 	if cfg.Firestore.Database == "" {
 		cfg.Firestore.Database = "(default)"
+	}
+	if cfg.OSV.CacheDir == "" {
+		cfg.OSV.CacheDir = ".cache/osv"
+	}
+	if cfg.OSV.CacheTTL == 0 {
+		cfg.OSV.CacheTTL = 24 // Default 24 hours
 	}
 
 	return &cfg, nil

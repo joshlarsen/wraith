@@ -5,6 +5,7 @@ import (
 	"flag"
 	"log"
 	"os"
+	"time"
 
 	"github.com/ghostsecurity/wraith/internal/classifier"
 	"github.com/ghostsecurity/wraith/internal/config"
@@ -68,14 +69,14 @@ func main() {
 
 	// Print final summary
 	if processor.processedCount > 0 {
-		avgProcessingTime := processor.totalProcessingTimeMs / int64(processor.processedCount)
+		avgProcessingTime := processor.totalProcessingTime / time.Duration(processor.processedCount)
 		avgTokensPerVuln := processor.totalTokens / processor.processedCount
 		log.Printf("=== FINAL SUMMARY ===")
 		log.Printf("Total vulnerabilities processed: %d", processor.processedCount)
-		log.Printf("Average processing time: %dms", avgProcessingTime)
+		log.Printf("Average processing time: %v", avgProcessingTime)
 		log.Printf("Average tokens per vulnerability: %d", avgTokensPerVuln)
 		log.Printf("Total tokens used: %d", processor.totalTokens)
-		log.Printf("Total processing time: %.2fs", float64(processor.totalProcessingTimeMs)/1000.0)
+		log.Printf("Total processing time: %v", processor.totalProcessingTime)
 	}
 
 	log.Println("Processing completed successfully")
@@ -89,9 +90,9 @@ type VulnerabilityProcessor struct {
 	lastTimestamp string
 
 	// Metrics tracking
-	totalProcessingTimeMs int64
-	totalTokens           int
-	processedCount        int
+	totalProcessingTime time.Duration
+	totalTokens         int
+	processedCount      int
 }
 
 func (p *VulnerabilityProcessor) Run(ctx context.Context) error {
@@ -125,13 +126,13 @@ func (p *VulnerabilityProcessor) processVulnerability(ctx context.Context, vuln 
 	}
 
 	// Update metrics tracking
-	p.totalProcessingTimeMs += classification.ProcessingTimeMs
+	p.totalProcessingTime += classification.ProcessingTime
 	p.totalTokens += classification.TotalTokens
 	p.processedCount++
 
-	log.Printf("Processed vulnerability: %s (processing: %dms, tokens: %d input/%d output/%d total, published: %s)",
+	log.Printf("Processed vulnerability: %s [%v : ↑ %dt / ↓ %dt (%dt), pub: %s]",
 		vuln.ID,
-		classification.ProcessingTimeMs,
+		classification.ProcessingTime,
 		classification.InputTokens,
 		classification.OutputTokens,
 		classification.TotalTokens,
@@ -139,9 +140,9 @@ func (p *VulnerabilityProcessor) processVulnerability(ctx context.Context, vuln 
 
 	// Print periodic summary every 10 vulnerabilities
 	if p.processedCount%10 == 0 {
-		avgProcessingTime := p.totalProcessingTimeMs / int64(p.processedCount)
+		avgProcessingTime := p.totalProcessingTime / time.Duration(p.processedCount)
 		avgTokensPerVuln := p.totalTokens / p.processedCount
-		log.Printf("--- Summary: %d vulnerabilities processed | Avg processing: %dms | Avg tokens: %d | Total tokens: %d ---",
+		log.Printf("--- Summary: %d vulnerabilities processed | Avg processing: %v | Avg tokens: %d | Total tokens: %d ---",
 			p.processedCount, avgProcessingTime, avgTokensPerVuln, p.totalTokens)
 	}
 

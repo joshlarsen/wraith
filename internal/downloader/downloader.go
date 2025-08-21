@@ -2,11 +2,14 @@ package downloader
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -55,6 +58,14 @@ type CSVRecord struct {
 	Ecosystem string
 	VulnID    string
 	FullPath  string
+}
+
+type CacheMetadata struct {
+	URL          string    `json:"url"`
+	ETag         string    `json:"etag,omitempty"`
+	LastModified string    `json:"last_modified,omitempty"`
+	CachedAt     time.Time `json:"cached_at"`
+	TTL          int       `json:"ttl_hours"`
 }
 
 func New(cfg *config.OSVConfig) *Downloader {
@@ -117,6 +128,75 @@ func (d *Downloader) ProcessVulnerabilities(ctx context.Context, lastTimestamp s
 }
 
 func (d *Downloader) downloadCSV(ctx context.Context) ([]*CSVRecord, error) {
+	cacheKey := d.generateCacheKey(d.config.ModifiedCSVURL)
+	cachePath := filepath.Join(d.config.CacheDir, cacheKey+".csv")
+	metadataPath := filepath.Join(d.config.CacheDir, cacheKey+".meta.json")
+
+	// Try to load from cache first
+	if records, valid := d.loadFromCache(cachePath, metadataPath); valid {
+		fmt.Println("Using cached CSV data")
+		return records, nil
+	}
+
+	fmt.Println("Downloading fresh CSV data")
+	return d.downloadAndCache(ctx, cachePath, metadataPath)
+}
+
+func (d *Downloader) generateCacheKey(url string) string {
+	h := sha256.New()
+	h.Write([]byte(url))
+	return fmt.Sprintf("%x", h.Sum(nil))[:16]
+}
+
+func (d *Downloader) loadFromCache(cachePath, metadataPath string) ([]*CSVRecord, bool) {
+	// Check if cache files exist
+	if _, err := os.Stat(cachePath); os.IsNotExist(err) {
+		return nil, false
+	}
+	if _, err := os.Stat(metadataPath); os.IsNotExist(err) {
+		return nil, false
+	}
+
+	// Load and validate metadata
+	metaData, err := os.ReadFile(metadataPath)
+	if err != nil {
+		return nil, false
+	}
+
+	var meta CacheMetadata
+	if err := json.Unmarshal(metaData, &meta); err != nil {
+		return nil, false
+	}
+
+	// Check if cache is expired
+	if d.config.CacheTTL > 0 {
+		expireTime := meta.CachedAt.Add(time.Duration(d.config.CacheTTL) * time.Hour)
+		if time.Now().After(expireTime) {
+			return nil, false
+		}
+	}
+
+	// Load cached CSV data
+	file, err := os.Open(cachePath)
+	if err != nil {
+		return nil, false
+	}
+	defer file.Close()
+
+	records, err := d.parseCSV(file)
+	if err != nil {
+		return nil, false
+	}
+
+	return records, true
+}
+
+func (d *Downloader) downloadAndCache(ctx context.Context, cachePath, metadataPath string) ([]*CSVRecord, error) {
+	// Ensure cache directory exists
+	if err := os.MkdirAll(filepath.Dir(cachePath), 0755); err != nil {
+		return nil, fmt.Errorf("creating cache directory: %w", err)
+	}
+
 	req, err := http.NewRequestWithContext(ctx, "GET", d.config.ModifiedCSVURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("creating request: %w", err)
@@ -132,11 +212,45 @@ func (d *Downloader) downloadCSV(ctx context.Context) ([]*CSVRecord, error) {
 		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, resp.Status)
 	}
 
-	reader := csv.NewReader(resp.Body)
+	// Create temporary file to store downloaded content
+	tmpFile, err := os.CreateTemp(filepath.Dir(cachePath), "csv_download_*.tmp")
+	if err != nil {
+		return nil, fmt.Errorf("creating temp file: %w", err)
+	}
+	defer os.Remove(tmpFile.Name())
+
+	// Copy response to temp file
+	if _, err := io.Copy(tmpFile, resp.Body); err != nil {
+		tmpFile.Close()
+		return nil, fmt.Errorf("copying CSV data: %w", err)
+	}
+
+	// Parse CSV from temp file
+	if _, err := tmpFile.Seek(0, 0); err != nil {
+		tmpFile.Close()
+		return nil, fmt.Errorf("seeking temp file: %w", err)
+	}
+
+	records, err := d.parseCSV(tmpFile)
+	tmpFile.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	// Save to cache
+	if err := d.saveToCache(tmpFile.Name(), cachePath, metadataPath, resp.Header); err != nil {
+		fmt.Printf("Warning: Failed to save to cache: %v\n", err)
+	}
+
+	return records, nil
+}
+
+func (d *Downloader) parseCSV(reader io.Reader) ([]*CSVRecord, error) {
+	csvReader := csv.NewReader(reader)
 	var records []*CSVRecord
 
 	for {
-		row, err := reader.Read()
+		row, err := csvReader.Read()
 		if err == io.EOF {
 			break
 		}
@@ -163,6 +277,33 @@ func (d *Downloader) downloadCSV(ctx context.Context) ([]*CSVRecord, error) {
 	}
 
 	return records, nil
+}
+
+func (d *Downloader) saveToCache(tmpPath, cachePath, metadataPath string, headers http.Header) error {
+	// Move temp file to cache location
+	if err := os.Rename(tmpPath, cachePath); err != nil {
+		return fmt.Errorf("moving temp file to cache: %w", err)
+	}
+
+	// Save metadata
+	meta := CacheMetadata{
+		URL:          d.config.ModifiedCSVURL,
+		ETag:         headers.Get("ETag"),
+		LastModified: headers.Get("Last-Modified"),
+		CachedAt:     time.Now(),
+		TTL:          d.config.CacheTTL,
+	}
+
+	metaData, err := json.MarshalIndent(meta, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshaling metadata: %w", err)
+	}
+
+	if err := os.WriteFile(metadataPath, metaData, 0644); err != nil {
+		return fmt.Errorf("writing metadata: %w", err)
+	}
+
+	return nil
 }
 
 func (d *Downloader) processBatch(ctx context.Context, batch []*CSVRecord, processFunc func(context.Context, *Vulnerability) error) error {

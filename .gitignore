@@ -34,3 +34,6 @@ go.work.sum
 .DS_Store
 config.yaml
 wraith
+
+# Cache directory
+.cache/

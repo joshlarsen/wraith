@@ -43,10 +43,10 @@ type Classification struct {
 	OSVWithdrawn string `json:"-" firestore:"osv_withdrawn,omitempty"`
 
 	// Processing metrics
-	ProcessingTimeMs int64 `json:"-" firestore:"processing_time_ms"`
-	InputTokens      int   `json:"-" firestore:"input_tokens"`
-	OutputTokens     int   `json:"-" firestore:"output_tokens"`
-	TotalTokens      int   `json:"-" firestore:"total_tokens"`
+	ProcessingTime time.Duration `json:"-" firestore:"processing_time"`
+	InputTokens    int           `json:"-" firestore:"input_tokens"`
+	OutputTokens   int           `json:"-" firestore:"output_tokens"`
+	TotalTokens    int           `json:"-" firestore:"total_tokens"`
 }
 
 type Classifier struct {
@@ -104,7 +104,7 @@ func (c *Classifier) Classify(ctx context.Context, vuln *downloader.Vulnerabilit
 	classification.OSVWithdrawn = vuln.Withdrawn
 
 	// Set processing metrics
-	classification.ProcessingTimeMs = processingTime.Milliseconds()
+	classification.ProcessingTime = processingTime
 	classification.InputTokens = result.InputTokens
 	classification.OutputTokens = result.OutputTokens
 	classification.TotalTokens = result.TotalTokens

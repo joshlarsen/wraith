@@ -14,6 +14,8 @@ osv:
   modified_csv_url: "https://osv-vulnerabilities.storage.googleapis.com/modified_id.csv"
   api_url: "https://api.osv.dev/v1"
   ecosystem: "npm"  # Optional: filter by ecosystem (npm, PyPI, Go, etc.)
+  cache_dir: ".cache/osv"  # Optional: directory for CSV cache files, defaults to ".cache/osv"
+  cache_ttl: 24  # Optional: cache TTL in hours, defaults to 24 hours, 0 = no expiration
 
 # Examples of custom base URLs for OpenAI-compatible services:
 #
