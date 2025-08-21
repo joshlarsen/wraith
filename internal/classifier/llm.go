@@ -7,14 +7,17 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"reflect"
 	"time"
 
 	"github.com/ghostsecurity/wraith/internal/config"
+	jsonschema "github.com/swaggest/jsonschema-go"
 )
 
 // LLMClient interface allows for different LLM providers
 type LLMClient interface {
 	Chat(ctx context.Context, messages []Message) (*ChatResponse, error)
+	ChatStructured(ctx context.Context, messages []Message, responseStruct interface{}) (interface{}, error)
 }
 
 type Message struct {
@@ -126,6 +129,59 @@ func (c *OpenAIClient) Chat(ctx context.Context, messages []Message) (*ChatRespo
 	return c.makeRequest(ctx, "/chat/completions", payload)
 }
 
+func (c *OpenAIClient) ChatStructured(ctx context.Context, messages []Message, responseStruct interface{}) (interface{}, error) {
+	// Generate JSON schema from the struct
+	reflector := jsonschema.Reflector{}
+	schema, err := reflector.Reflect(responseStruct)
+	if err != nil {
+		return nil, fmt.Errorf("generating schema: %w", err)
+	}
+
+	setAdditionalPropertiesFalse(&schema)
+
+	// Convert schema to map for JSON marshaling
+	schemaBytes, err := json.Marshal(schema)
+	if err != nil {
+		return nil, fmt.Errorf("marshaling schema: %w", err)
+	}
+
+	var schemaMap map[string]interface{}
+	if err := json.Unmarshal(schemaBytes, &schemaMap); err != nil {
+		return nil, fmt.Errorf("unmarshaling schema: %w", err)
+	}
+
+	payload := map[string]interface{}{
+		"model":    c.model,
+		"messages": messages,
+		"response_format": map[string]interface{}{
+			"type": "json_schema",
+			"json_schema": map[string]interface{}{
+				"name":   "response",
+				"schema": schemaMap,
+				"strict": true,
+			},
+		},
+	}
+
+	response, err := c.makeRequest(ctx, "/chat/completions", payload)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal the response content directly into the struct type
+	structType := reflect.TypeOf(responseStruct)
+	if structType.Kind() == reflect.Ptr {
+		structType = structType.Elem()
+	}
+
+	result := reflect.New(structType).Interface()
+	if err := json.Unmarshal([]byte(response.Content), result); err != nil {
+		return nil, fmt.Errorf("unmarshaling structured response: %w", err)
+	}
+
+	return result, nil
+}
+
 func (c *OpenAIClient) makeRequest(ctx context.Context, endpoint string, payload map[string]interface{}) (*ChatResponse, error) {
 	data, err := json.Marshal(payload)
 	if err != nil {
@@ -199,6 +255,71 @@ func (c *AnthropicClient) Chat(ctx context.Context, messages []Message) (*ChatRe
 	return c.makeRequest(ctx, "/messages", payload)
 }
 
+func (c *AnthropicClient) ChatStructured(ctx context.Context, messages []Message, responseStruct interface{}) (interface{}, error) {
+	// Generate JSON schema from the struct
+	reflector := jsonschema.Reflector{}
+	schema, err := reflector.Reflect(responseStruct)
+	if err != nil {
+		return nil, fmt.Errorf("generating schema: %w", err)
+	}
+
+	// Convert schema to map for JSON marshaling
+	schemaBytes, err := json.Marshal(schema)
+	if err != nil {
+		return nil, fmt.Errorf("marshaling schema: %w", err)
+	}
+
+	var schemaMap map[string]interface{}
+	if err := json.Unmarshal(schemaBytes, &schemaMap); err != nil {
+		return nil, fmt.Errorf("unmarshaling schema: %w", err)
+	}
+
+	// Convert messages to Anthropic format
+	var systemMessage string
+	var userMessages []Message
+
+	for _, msg := range messages {
+		if msg.Role == "system" {
+			systemMessage = msg.Content
+		} else {
+			userMessages = append(userMessages, msg)
+		}
+	}
+
+	// Add schema instruction to the system message
+	schemaInstruction := fmt.Sprintf("\n\nYou must respond with valid JSON that matches this exact schema: %s", string(schemaBytes))
+	if systemMessage != "" {
+		systemMessage += schemaInstruction
+	} else {
+		systemMessage = "Respond with valid JSON." + schemaInstruction
+	}
+
+	payload := map[string]interface{}{
+		"model":      c.model,
+		"max_tokens": 4096,
+		"messages":   userMessages,
+		"system":     systemMessage,
+	}
+
+	response, err := c.makeRequest(ctx, "/messages", payload)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal the response content directly into the struct type
+	structType := reflect.TypeOf(responseStruct)
+	if structType.Kind() == reflect.Ptr {
+		structType = structType.Elem()
+	}
+
+	result := reflect.New(structType).Interface()
+	if err := json.Unmarshal([]byte(response.Content), result); err != nil {
+		return nil, fmt.Errorf("unmarshaling structured response: %w", err)
+	}
+
+	return result, nil
+}
+
 func (c *AnthropicClient) makeRequest(ctx context.Context, endpoint string, payload map[string]interface{}) (*ChatResponse, error) {
 	data, err := json.Marshal(payload)
 	if err != nil {
@@ -249,4 +370,25 @@ func (c *VertexClient) Chat(ctx context.Context, messages []Message) (*ChatRespo
 	// This is a simplified implementation
 	// In production, you'd use the Google Cloud SDK and proper authentication
 	return nil, fmt.Errorf("Vertex AI implementation requires Google Cloud SDK setup")
+}
+
+func (c *VertexClient) ChatStructured(ctx context.Context, messages []Message, responseStruct interface{}) (interface{}, error) {
+	// This is a simplified implementation
+	// In production, you'd use the Google Cloud SDK and proper authentication
+	return nil, fmt.Errorf("Vertex AI structured output implementation requires Google Cloud SDK setup")
+}
+
+// setAdditionalPropertiesFalse recursively sets additionalProperties to false
+// at the top level and all definitions; this is required by the OpenAI API
+func setAdditionalPropertiesFalse(schema *jsonschema.Schema) {
+	schema.AdditionalProperties = &jsonschema.SchemaOrBool{}
+	schema.AdditionalProperties.WithTypeBoolean(false)
+
+	if schema.Definitions != nil {
+		for _, def := range schema.Definitions {
+			if def.TypeObject != nil {
+				setAdditionalPropertiesFalse(def.TypeObject)
+			}
+		}
+	}
 }

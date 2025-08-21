@@ -4,6 +4,7 @@ go 1.24.6
 
 require (
 	cloud.google.com/go/firestore v1.15.0
+	github.com/swaggest/jsonschema-go v0.3.78
 	google.golang.org/api v0.169.0
 	google.golang.org/grpc v1.62.0
 	gopkg.in/yaml.v3 v3.0.1
@@ -22,6 +23,7 @@ require (
 	github.com/google/s2a-go v0.1.7 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.2 // indirect
 	github.com/googleapis/gax-go/v2 v2.12.2 // indirect
+	github.com/swaggest/refl v1.4.0 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.49.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.49.0 // indirect

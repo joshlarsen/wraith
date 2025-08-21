@@ -2,7 +2,6 @@ package classifier
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -12,29 +11,30 @@ import (
 
 // Classification represents our 6-dimensional vulnerability classification
 type Classification struct {
-	VulnerabilityID string `json:"vulnerability_id" firestore:"vulnerability_id"`
+	VulnerabilityID  string `json:"vulnerability_id" firestore:"vulnerability_id" required:"true" description:"Unique identifier for the vulnerability"`
+	VulnerabilityURL string `json:"vulnerability_url" firestore:"vulnerability_url" required:"true" description:"OSV URL of the vulnerability"`
 
 	// 1. Verifiability
-	Verifiability string `json:"verifiability" firestore:"verifiability"` // verifiable, non-verifiable, partially-verifiable
+	Verifiability string `json:"verifiability" firestore:"verifiability" required:"true" enum:"verifiable,non-verifiable,partially-verifiable" description:"Whether the vulnerability can be objectively verified"`
 
 	// 2. Exploitability Context
-	ExploitabilityContext string `json:"exploitability_context" firestore:"exploitability_context"` // direct-dependency, transitive-dependency, development-only, runtime-critical
+	ExploitabilityContext string `json:"exploitability_context" firestore:"exploitability_context" required:"true" enum:"direct-dependency,transitive-dependency,development-only,runtime-critical" description:"Context in which the vulnerability can be exploited"`
 
 	// 3. Attack Vector Accessibility
-	AttackVector string `json:"attack_vector" firestore:"attack_vector"` // user-input-required, network-accessible, local-only, configuration-dependent
+	AttackVector string `json:"attack_vector" firestore:"attack_vector" required:"true" enum:"user-input-required,network-accessible,local-only,configuration-dependent" description:"How the vulnerability can be accessed for exploitation"`
 
 	// 4. Impact Scope
-	ImpactScope string `json:"impact_scope" firestore:"impact_scope"` // data-confidentiality, data-integrity, system-availability, code-execution, privilege-escalation
+	ImpactScope string `json:"impact_scope" firestore:"impact_scope" required:"true" enum:"data-integrity,data-confidentiality,system-availability,code-execution,privilege-escalation" description:"The type of impact the vulnerability can have"`
 
 	// 5. Remediation Complexity
-	RemediationComplexity string `json:"remediation_complexity" firestore:"remediation_complexity"` // simple-update, breaking-change, no-fix-available, workaround-available, architecture-change
+	RemediationComplexity string `json:"remediation_complexity" firestore:"remediation_complexity" required:"true" enum:"simple-update,breaking-change,no-fix-available,workaround-available,architecture-change" description:"How complex it is to fix the vulnerability"`
 
 	// 6. Temporal Classification
-	TemporalClassification string `json:"temporal_classification" firestore:"temporal_classification"` // zero-day, active-exploitation, stable-mature, legacy
+	TemporalClassification string `json:"temporal_classification" firestore:"temporal_classification" required:"true" enum:"zero-day,active-exploitation,stable-mature,legacy" description:"The temporal nature of the vulnerability"`
 
 	// Additional metadata
-	Reasoning   string `json:"reasoning" firestore:"reasoning"`
-	ProcessedAt string `json:"processed_at" firestore:"processed_at"`
+	Reasoning   string `json:"reasoning" firestore:"reasoning" required:"true" description:"Brief explanation of the classification decisions"`
+	ProcessedAt string `json:"processed_at" firestore:"processed_at" required:"true" description:"Timestamp when the classification was processed"`
 }
 
 type Classifier struct {
@@ -61,15 +61,23 @@ func (c *Classifier) Classify(ctx context.Context, vuln *downloader.Vulnerabilit
 		},
 	}
 
-	response, err := c.llmClient.Chat(ctx, messages)
+	result, err := c.llmClient.ChatStructured(ctx, messages, &Classification{})
 	if err != nil {
-		return nil, fmt.Errorf("LLM classification failed: %w", err)
+		return nil, fmt.Errorf("LLM structured classification failed: %w", err)
 	}
 
-	classification, err := c.parseClassificationResponse(response.Content, vuln.ID)
-	if err != nil {
-		return nil, fmt.Errorf("parsing classification response: %w", err)
+	classification, ok := result.(*Classification)
+	if !ok {
+		return nil, fmt.Errorf("unexpected response type: %T", result)
 	}
+
+	// Validate required fields
+	if err := c.validateClassification(classification); err != nil {
+		return nil, fmt.Errorf("validation failed: %w", err)
+	}
+
+	classification.VulnerabilityID = vuln.ID
+	classification.ProcessedAt = time.Now().Format(time.RFC3339)
 
 	return classification, nil
 }
@@ -114,33 +122,6 @@ func (c *Classifier) buildClassificationPrompt(vuln *downloader.Vulnerability) s
 	}
 
 	return builder.String()
-}
-
-func (c *Classifier) parseClassificationResponse(response, vulnID string) (*Classification, error) {
-	// Try to extract JSON from the response
-	jsonStart := strings.Index(response, "{")
-	jsonEnd := strings.LastIndex(response, "}")
-
-	if jsonStart == -1 || jsonEnd == -1 || jsonEnd <= jsonStart {
-		return nil, fmt.Errorf("no JSON found in response")
-	}
-
-	jsonStr := response[jsonStart : jsonEnd+1]
-
-	var classification Classification
-	if err := json.Unmarshal([]byte(jsonStr), &classification); err != nil {
-		return nil, fmt.Errorf("unmarshaling JSON: %w", err)
-	}
-
-	// Validate required fields
-	if err := c.validateClassification(&classification); err != nil {
-		return nil, fmt.Errorf("validation failed: %w", err)
-	}
-
-	classification.VulnerabilityID = vulnID
-	classification.ProcessedAt = time.Now().Format(time.RFC3339)
-
-	return &classification, nil
 }
 
 func (c *Classifier) validateClassification(classification *Classification) error {
