@@ -8,6 +8,7 @@ import (
 	"cloud.google.com/go/firestore"
 	"github.com/ghostsecurity/wraith/internal/classifier"
 	"github.com/ghostsecurity/wraith/internal/config"
+	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -17,6 +18,7 @@ type Storage interface {
 	StoreClassification(ctx context.Context, vulnID string, classification *classifier.Classification) error
 	GetLastProcessedTimestamp(ctx context.Context) (string, error)
 	UpdateLastProcessedTimestamp(ctx context.Context, timestamp string) error
+	GetAllClassifications(ctx context.Context) (map[string]*classifier.Classification, error)
 	Close() error
 }
 
@@ -146,4 +148,31 @@ func (fs *FirestoreStorage) ClassificationExists(ctx context.Context, vulnID str
 		return false, fmt.Errorf("checking if classification exists: %w", err)
 	}
 	return true, nil
+}
+
+// GetAllClassifications retrieves all stored classifications
+func (fs *FirestoreStorage) GetAllClassifications(ctx context.Context) (map[string]*classifier.Classification, error) {
+	iter := fs.client.Collection(fs.collection).Documents(ctx)
+	defer iter.Stop()
+
+	classifications := make(map[string]*classifier.Classification)
+
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("iterating through classifications: %w", err)
+		}
+
+		var classification classifier.Classification
+		if err := doc.DataTo(&classification); err != nil {
+			return nil, fmt.Errorf("parsing classification for %s: %w", doc.Ref.ID, err)
+		}
+
+		classifications[doc.Ref.ID] = &classification
+	}
+
+	return classifications, nil
 }

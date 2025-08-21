@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"time"
@@ -14,12 +16,40 @@ import (
 )
 
 func main() {
-	var (
-		configPath = flag.String("config", "config.yaml", "Path to configuration file")
-		resume     = flag.Bool("resume", false, "Resume from last processed timestamp")
-		batchSize  = flag.Int("batch", 100, "Number of vulnerabilities to process in each batch")
-	)
-	flag.Parse()
+	if len(os.Args) < 2 {
+		printUsage()
+		os.Exit(1)
+	}
+
+	command := os.Args[1]
+	switch command {
+	case "process":
+		runProcessCommand()
+	case "report":
+		runReportCommand()
+	default:
+		fmt.Printf("Unknown command: %s\n", command)
+		printUsage()
+		os.Exit(1)
+	}
+}
+
+func printUsage() {
+	fmt.Println("Usage: wraith <command> [options]")
+	fmt.Println()
+	fmt.Println("Commands:")
+	fmt.Println("  process  Process vulnerabilities from OSV database")
+	fmt.Println("  report   Generate report of all processed vulnerabilities")
+	fmt.Println()
+	fmt.Println("Use 'wraith <command> -h' for command-specific help")
+}
+
+func runProcessCommand() {
+	processFlags := flag.NewFlagSet("process", flag.ExitOnError)
+	configPath := processFlags.String("config", "config.yaml", "Path to configuration file")
+	resume := processFlags.Bool("resume", false, "Resume from last processed timestamp")
+	batchSize := processFlags.Int("batch", 100, "Number of vulnerabilities to process in each batch")
+	processFlags.Parse(os.Args[2:])
 
 	// Load configuration
 	cfg, err := config.Load(*configPath)
@@ -80,6 +110,59 @@ func main() {
 	}
 
 	log.Println("Processing completed successfully")
+}
+
+func runReportCommand() {
+	reportFlags := flag.NewFlagSet("report", flag.ExitOnError)
+	configPath := reportFlags.String("config", "config.yaml", "Path to configuration file")
+	outputPath := reportFlags.String("output", "vulnerability_report.json", "Output file path for the report")
+	reportFlags.Parse(os.Args[2:])
+
+	// Load configuration
+	cfg, err := config.Load(*configPath)
+	if err != nil {
+		log.Fatalf("Failed to load config: %v", err)
+	}
+
+	ctx := context.Background()
+
+	// Initialize Firestore storage
+	storage, err := storage.NewFirestore(ctx, &cfg.Firestore)
+	if err != nil {
+		log.Fatalf("Failed to initialize Firestore: %v", err)
+	}
+	defer storage.Close()
+
+	log.Printf("Fetching all processed vulnerabilities from Firestore...")
+
+	// Get all vulnerabilities
+	vulnerabilities, err := storage.GetAllClassifications(ctx)
+	if err != nil {
+		log.Fatalf("Failed to fetch vulnerabilities: %v", err)
+	}
+
+	if len(vulnerabilities) == 0 {
+		log.Printf("No vulnerabilities found in database")
+		return
+	}
+
+	log.Printf("Found %d vulnerabilities, writing to %s", len(vulnerabilities), *outputPath)
+
+	// Write to JSON file
+	file, err := os.Create(*outputPath)
+	if err != nil {
+		log.Fatalf("Failed to create output file: %v", err)
+	}
+	defer file.Close()
+
+	encoder := json.NewEncoder(file)
+	encoder.SetIndent("", "  ")
+
+	if err := encoder.Encode(vulnerabilities); err != nil {
+		log.Fatalf("Failed to write JSON: %v", err)
+	}
+
+	log.Printf("Report generated successfully: %s", *outputPath)
 }
 
 type VulnerabilityProcessor struct {

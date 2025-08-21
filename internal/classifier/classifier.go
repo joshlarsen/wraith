@@ -16,7 +16,9 @@ type Classification struct {
 	VulnerabilityURL string `json:"-" firestore:"vulnerability_url"`
 
 	// 1. Verifiability
-	Verifiability string `json:"verifiability" firestore:"verifiability" required:"true" enum:"verifiable,non-verifiable,partially-verifiable" description:"Whether the vulnerability can be objectively verified"`
+	Verifiability      string `json:"verifiability" firestore:"verifiability" required:"true" enum:"verifiable,non-verifiable,partially-verifiable" description:"Whether the vulnerability can be objectively verified"`
+	VerifiablePackage  string `json:"verifiable_package" firestore:"verifiable_package" required:"true" description:"The package that can be used to verify the vulnerability. If the vulnerability is not verifiable, this must be 'none'. If the vulnerability is verifiable, this must be a package name that would be imported by the affected file. If the vulnerability is verifiable through a configuration setting, this must be 'config'."`
+	VerifiableFunction string `json:"verifiable_function" firestore:"verifiable_function" required:"true" description:"The function that is the indicator of the vulnerable condition. If the vulnerability is not verifiable, this must be 'none'. If the vulnerability is verifiable, this must be a function name that would be called by the affected file. If the vulnerability is verifiable through a configuration setting, this must be the raw string to search for in the source code."`
 
 	// 2. Exploitability Context
 	ExploitabilityContext string `json:"exploitability_context" firestore:"exploitability_context" required:"true" enum:"direct-dependency,transitive-dependency,development-only,runtime-critical" description:"Context in which the vulnerability can be exploited"`
@@ -199,8 +201,8 @@ const systemPrompt = `You are an expert security analyst specializing in vulnera
 For each vulnerability, you must classify it across these 6 dimensions:
 
 1. **Verifiability**:
-   - verifiable: Objective code/config patterns can confirm presence (e.g., specific function names, configuration settings)
-   - non-verifiable: Requires behavioral analysis or complex logic inspection
+   - verifiable: Objective code/config patterns can confirm presence (e.g., specific function names, configuration settings); if you can't name a specific package, function, or configuration setting, this should be 'non-verifiable'
+   - non-verifiable: Requires behavioral analysis or complex logic inspection; cannot be verified by code/config patterns
    - partially-verifiable: Some indicators present but incomplete confirmation possible
 
 2. **Exploitability Context**:
@@ -235,16 +237,4 @@ For each vulnerability, you must classify it across these 6 dimensions:
    - stable-mature: Well-documented with established remediation
    - legacy: Old vulnerability in deprecated component
 
-Respond with a JSON object containing your classification and reasoning:
-
-{
-  "verifiability": "value",
-  "exploitability_context": "value", 
-  "attack_vector": "value",
-  "impact_scope": "value",
-  "remediation_complexity": "value",
-  "temporal_classification": "value",
-  "reasoning": "Brief explanation of your classification decisions"
-}
-
-Focus on objective analysis based on the vulnerability details provided.`
+Focus on objective analysis based on the vulnerability details provided. Do not make assumptions about conditions that might exist. Environment context will be considered in later analysis. Only base your objective judgement on factual data in the vulnerability writeup.`
