@@ -37,6 +37,11 @@ type Classification struct {
 	Reasoning   string `json:"reasoning" firestore:"reasoning" required:"true" description:"Brief explanation of the classification decisions"`
 	ProcessedAt string `json:"-" firestore:"processed_at"`
 
+	// OSV timestamp preservation
+	OSVPublished string `json:"-" firestore:"osv_published"`
+	OSVModified  string `json:"-" firestore:"osv_modified"`
+	OSVWithdrawn string `json:"-" firestore:"osv_withdrawn,omitempty"`
+
 	// Processing metrics
 	ProcessingTimeMs int64 `json:"-" firestore:"processing_time_ms"`
 	InputTokens      int   `json:"-" firestore:"input_tokens"`
@@ -92,6 +97,13 @@ func (c *Classifier) Classify(ctx context.Context, vuln *downloader.Vulnerabilit
 	classification.VulnerabilityID = vuln.ID
 	classification.VulnerabilityURL = fmt.Sprintf("%s/vulns/%s", c.osvConfig.APIURL, vuln.ID)
 	classification.ProcessedAt = time.Now().Format(time.RFC3339)
+
+	// Preserve OSV timestamps
+	classification.OSVPublished = vuln.Published
+	classification.OSVModified = vuln.Modified
+	classification.OSVWithdrawn = vuln.Withdrawn
+
+	// Set processing metrics
 	classification.ProcessingTimeMs = processingTime.Milliseconds()
 	classification.InputTokens = result.InputTokens
 	classification.OutputTokens = result.OutputTokens

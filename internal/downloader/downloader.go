@@ -19,12 +19,14 @@ type Downloader struct {
 }
 
 type Vulnerability struct {
-	ID       string   `json:"id"`
-	Modified string   `json:"modified"`
-	Summary  string   `json:"summary"`
-	Details  string   `json:"details"`
-	Aliases  []string `json:"aliases"`
-	Affected []struct {
+	ID        string   `json:"id"`
+	Modified  string   `json:"modified"`
+	Published string   `json:"published"`
+	Withdrawn string   `json:"withdrawn,omitempty"`
+	Summary   string   `json:"summary"`
+	Details   string   `json:"details"`
+	Aliases   []string `json:"aliases"`
+	Affected  []struct {
 		Package struct {
 			Name      string `json:"name"`
 			Ecosystem string `json:"ecosystem"`

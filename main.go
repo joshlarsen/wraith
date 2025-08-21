@@ -129,12 +129,13 @@ func (p *VulnerabilityProcessor) processVulnerability(ctx context.Context, vuln 
 	p.totalTokens += classification.TotalTokens
 	p.processedCount++
 
-	log.Printf("Processed vulnerability: %s (processing: %dms, tokens: ↑ %d t / ↓%d t (%d)",
+	log.Printf("Processed vulnerability: %s (processing: %dms, tokens: %d input/%d output/%d total, published: %s)",
 		vuln.ID,
 		classification.ProcessingTimeMs,
 		classification.InputTokens,
 		classification.OutputTokens,
-		classification.TotalTokens)
+		classification.TotalTokens,
+		classification.OSVPublished)
 
 	// Print periodic summary every 10 vulnerabilities
 	if p.processedCount%10 == 0 {
