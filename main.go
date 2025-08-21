@@ -40,7 +40,7 @@ func main() {
 		log.Fatalf("Failed to initialize LLM client: %v", err)
 	}
 
-	classifier := classifier.New(llmClient)
+	classifier := classifier.New(llmClient, &cfg.OSV)
 	downloader := downloader.New(&cfg.OSV)
 
 	// Get last processed timestamp if resuming

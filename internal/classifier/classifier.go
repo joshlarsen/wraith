@@ -6,13 +6,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ghostsecurity/wraith/internal/config"
 	"github.com/ghostsecurity/wraith/internal/downloader"
 )
 
 // Classification represents our 6-dimensional vulnerability classification
 type Classification struct {
-	VulnerabilityID  string `json:"vulnerability_id" firestore:"vulnerability_id" required:"true" description:"Unique identifier for the vulnerability"`
-	VulnerabilityURL string `json:"vulnerability_url" firestore:"vulnerability_url" required:"true" description:"OSV URL of the vulnerability"`
+	VulnerabilityID  string `json:"-" firestore:"vulnerability_id"`
+	VulnerabilityURL string `json:"-" firestore:"vulnerability_url"`
 
 	// 1. Verifiability
 	Verifiability string `json:"verifiability" firestore:"verifiability" required:"true" enum:"verifiable,non-verifiable,partially-verifiable" description:"Whether the vulnerability can be objectively verified"`
@@ -39,11 +40,13 @@ type Classification struct {
 
 type Classifier struct {
 	llmClient LLMClient
+	osvConfig *config.OSVConfig
 }
 
-func New(llmClient LLMClient) *Classifier {
+func New(llmClient LLMClient, osvConfig *config.OSVConfig) *Classifier {
 	return &Classifier{
 		llmClient: llmClient,
+		osvConfig: osvConfig,
 	}
 }
 
@@ -77,6 +80,7 @@ func (c *Classifier) Classify(ctx context.Context, vuln *downloader.Vulnerabilit
 	}
 
 	classification.VulnerabilityID = vuln.ID
+	classification.VulnerabilityURL = fmt.Sprintf("%s/vulnerability/%s", c.osvConfig.BASEURL, vuln.ID)
 	classification.ProcessedAt = time.Now().Format(time.RFC3339)
 
 	return classification, nil

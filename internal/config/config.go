@@ -30,6 +30,7 @@ type LLMConfig struct {
 type OSVConfig struct {
 	ModifiedCSVURL string `yaml:"modified_csv_url"`
 	APIURL         string `yaml:"api_url"`
+	BASEURL        string `yaml:"base_url"`
 	Ecosystem      string `yaml:"ecosystem,omitempty"` // Optional: filter by ecosystem
 }
 
@@ -47,6 +48,9 @@ func Load(path string) (*Config, error) {
 	// Set defaults
 	if cfg.OSV.ModifiedCSVURL == "" {
 		cfg.OSV.ModifiedCSVURL = "https://osv-vulnerabilities.storage.googleapis.com/modified_id.csv"
+	}
+	if cfg.OSV.BASEURL == "" {
+		cfg.OSV.BASEURL = "https://osv.dev"
 	}
 	if cfg.OSV.APIURL == "" {
 		cfg.OSV.APIURL = "https://api.osv.dev/v1"
