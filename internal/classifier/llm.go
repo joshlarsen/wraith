@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ghostsecurity/vscan/internal/config"
+	"github.com/ghostsecurity/wraith/internal/config"
 )
 
 // LLMClient interface allows for different LLM providers

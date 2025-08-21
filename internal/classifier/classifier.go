@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ghostsecurity/vscan/internal/downloader"
+	"github.com/ghostsecurity/wraith/internal/downloader"
 )
 
 // Classification represents our 6-dimensional vulnerability classification

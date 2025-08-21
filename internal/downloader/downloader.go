@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ghostsecurity/vscan/internal/config"
+	"github.com/ghostsecurity/wraith/internal/config"
 )
 
 type Downloader struct {

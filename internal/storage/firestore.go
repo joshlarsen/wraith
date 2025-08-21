@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"cloud.google.com/go/firestore"
-	"github.com/ghostsecurity/vscan/internal/classifier"
-	"github.com/ghostsecurity/vscan/internal/config"
+	"github.com/ghostsecurity/wraith/internal/classifier"
+	"github.com/ghostsecurity/wraith/internal/config"
 	"google.golang.org/api/option"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

@@ -6,10 +6,10 @@ import (
 	"log"
 	"os"
 
-	"github.com/ghostsecurity/vscan/internal/classifier"
-	"github.com/ghostsecurity/vscan/internal/config"
-	"github.com/ghostsecurity/vscan/internal/downloader"
-	"github.com/ghostsecurity/vscan/internal/storage"
+	"github.com/ghostsecurity/wraith/internal/classifier"
+	"github.com/ghostsecurity/wraith/internal/config"
+	"github.com/ghostsecurity/wraith/internal/downloader"
+	"github.com/ghostsecurity/wraith/internal/storage"
 )
 
 func main() {
