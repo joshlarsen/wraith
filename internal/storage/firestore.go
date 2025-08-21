@@ -36,7 +36,7 @@ func NewFirestore(ctx context.Context, cfg *config.FirestoreConfig) (*FirestoreS
 	var err error
 
 	// Try to use Application Default Credentials first
-	client, err = firestore.NewClient(ctx, cfg.ProjectID)
+	client, err = firestore.NewClientWithDatabase(ctx, cfg.ProjectID, cfg.Database)
 	if err != nil {
 		return nil, fmt.Errorf("creating Firestore client: %w", err)
 	}
@@ -49,7 +49,7 @@ func NewFirestore(ctx context.Context, cfg *config.FirestoreConfig) (*FirestoreS
 }
 
 func NewFirestoreWithCredentials(ctx context.Context, cfg *config.FirestoreConfig, credentialsPath string) (*FirestoreStorage, error) {
-	client, err := firestore.NewClient(ctx, cfg.ProjectID, option.WithCredentialsFile(credentialsPath))
+	client, err := firestore.NewClientWithDatabase(ctx, cfg.ProjectID, cfg.Database, option.WithCredentialsFile(credentialsPath))
 	if err != nil {
 		return nil, fmt.Errorf("creating Firestore client with credentials: %w", err)
 	}

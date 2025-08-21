@@ -2,6 +2,7 @@
 
 firestore:
   project_id: "your-gcp-project-id"
+  database: "(default)"  # Optional: specify Firestore database name, defaults to "(default)"
   collection: "vulnerability_classifications"
 
 llm:

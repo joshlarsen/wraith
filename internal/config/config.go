@@ -15,6 +15,7 @@ type Config struct {
 
 type FirestoreConfig struct {
 	ProjectID  string `yaml:"project_id"`
+	Database   string `yaml:"database"`
 	Collection string `yaml:"collection"`
 }
 
@@ -52,6 +53,9 @@ func Load(path string) (*Config, error) {
 	}
 	if cfg.Firestore.Collection == "" {
 		cfg.Firestore.Collection = "vulnerability_classifications"
+	}
+	if cfg.Firestore.Database == "" {
+		cfg.Firestore.Database = "(default)"
 	}
 
 	return &cfg, nil
