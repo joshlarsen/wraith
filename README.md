@@ -56,25 +56,22 @@ osv:
 
 ## Usage
 
-Basic usage:
+Process vulnerabilities:
 ```bash
-go run main.go
+go run ./cmd/process
 ```
 
-With custom configuration:
+Generate reports:
 ```bash
-go run main.go -config custom-config.yaml
+go run ./cmd/report
 ```
 
-Resume from last processed timestamp:
+Debug with custom prompts:
 ```bash
-go run main.go -resume
+go run ./cmd/debug
 ```
 
-Custom batch size:
-```bash
-go run main.go -batch 50
-```
+Commands support standard Go flags - use `-h` for help on each command.
 
 ## LLM Provider Configuration
 
@@ -140,9 +137,11 @@ The application automatically saves progress to Firestore in the `processing_sta
 
 ## Development
 
-Build the application:
+Build the applications:
 ```bash
-go build -o vscan main.go
+go build -o process ./cmd/process
+go build -o report ./cmd/report
+go build -o debug ./cmd/debug
 ```
 
 Run tests:

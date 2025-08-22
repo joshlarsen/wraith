@@ -1,0 +1,3 @@
+I have this package installed in my project - the vulnerable version is listed in my package manifest.
+
+In three sentences or less, tell me how can I check my source code to see if I am vulnerable to this? I need to know if the vulnerable code is reachable in the live code path. Preferrably, I can verify if the affected code is present by grepping for 1-2 patterns. If I can't verify by grepping for patterns, just say the vulnerability is "non-verifiable". I only want to verify my own code, not third party `node_modules` code.

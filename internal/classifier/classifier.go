@@ -111,6 +111,11 @@ func (c *Classifier) Classify(ctx context.Context, vuln *downloader.Vulnerabilit
 	classification.OutputTokens = result.OutputTokens
 	classification.TotalTokens = result.TotalTokens
 
+	// override if the vuln is a malicious package
+	if strings.HasPrefix(vuln.ID, "MAL-") {
+		classification.Verifiability = "verifiable"
+	}
+
 	return classification, nil
 }
 

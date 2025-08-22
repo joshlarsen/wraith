@@ -308,7 +308,7 @@ func (d *Downloader) saveToCache(tmpPath, cachePath, metadataPath string, header
 
 func (d *Downloader) processBatch(ctx context.Context, batch []*CSVRecord, processFunc func(context.Context, *Vulnerability) error) error {
 	for _, record := range batch {
-		vuln, err := d.fetchVulnerability(ctx, record.VulnID)
+		vuln, err := d.FetchVulnerability(ctx, record.VulnID)
 		if err != nil {
 			fmt.Printf("Warning: Failed to fetch vulnerability %s: %v\n", record.VulnID, err)
 			continue
@@ -323,7 +323,7 @@ func (d *Downloader) processBatch(ctx context.Context, batch []*CSVRecord, proce
 	return nil
 }
 
-func (d *Downloader) fetchVulnerability(ctx context.Context, vulnID string) (*Vulnerability, error) {
+func (d *Downloader) FetchVulnerability(ctx context.Context, vulnID string) (*Vulnerability, error) {
 	url := fmt.Sprintf("%s/vulns/%s", d.config.APIURL, vulnID)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
