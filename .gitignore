@@ -33,7 +33,12 @@ go.work.sum
 
 .DS_Store
 config.yaml
+
+# Binaries
 wraith
+debug
+process
+report
 
 # Cache directory
 .cache/
